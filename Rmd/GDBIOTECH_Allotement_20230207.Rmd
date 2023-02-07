@@ -1,0 +1,439 @@
+---
+title: "R Notebook - Bact-to-Batch PUBLICATION"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+A new method based on microbiota fingerprinting to guide animal allotments for animal experiments 
+
+
+```{r load , echo=FALSE, warning=FALSE, message=FALSE}
+
+print("R version :  version.string R version 4.1.0 (2021-05-18)")
+
+print("Load packages")
+library(phyloseq) #1.38.0
+library(ggplot2) #3.4.0
+library(stringr) #1.4.0"
+library(dplyr) #1.0.9
+library(GUniFrac)  #1.7
+library(vegan) #2.6.2
+library(svglite) #2.0.0
+library(tidyverse) #1.3.1
+library(grid) #4.1.0
+library(ggpattern) #1.0.1
+library(gridExtra) #2.3
+library(kableExtra) #1.3.4
+library(RcppAlgos) #2.6.0
+library(analogue) #0.17-6
+library(foreach) #1.5.2
+library(anticlust) #O.6.2
+
+
+
+normalize_custom <- function(dataset){
+  normalized = (dataset -  min(dataset)) / (max(dataset) - min(dataset));
+  return(normalized)
+}
+
+
+```
+
+# NAIVE APPROACH - CONSTAT
+
+
+## CONSTAT - All solutions by ranking score
+
+
+```{r alldesign, echo=FALSE, warning=FALSE}
+
+print("Load the data.frame containing the 92378 results - Allotment 20 samples 2 groups")
+
+load("../Robjects/OUTPUT_TAB_STATS_COMBINATION_20_ALLOTMENT_WUNIFRAC_PUBLICATION_v.rdata1")
+
+#Order by ranking score
+tab_stats_combinaison_sorted =tab_stats_combinaison_ALL_WUNIFRAC[ order(tab_stats_combinaison_ALL_WUNIFRAC$METRIC_PVALUE),]
+
+#Categorize the design according to quantile of ranking score 
+quantile_metric= quantile(tab_stats_combinaison_sorted$METRIC_PVALUE, probs = c(0.05,0.95))
+tab_stats_combinaison_sorted$group = "SUB-OPTIMAL DESIGN"
+tab_stats_combinaison_sorted$group[tab_stats_combinaison_sorted$METRIC_PVALUE <= as.numeric(quantile_metric[1]) ] = "OPTIMAL DESIGN"
+tab_stats_combinaison_sorted$group[tab_stats_combinaison_sorted$METRIC_PVALUE >= as.numeric(quantile_metric[2]) ] = "HIGH-RISK DESIGN"
+
+#build the whole histogramm for the 92378 possible designs 
+compare_mean <- tab_stats_combinaison_sorted %>%
+        group_by(group) %>%
+        summarise(Mean = mean(METRIC_PVALUE))
+output_histo_allotement <- ggplot(tab_stats_combinaison_sorted, aes(x = METRIC_PVALUE, fill = group)) +
+        geom_histogram(binwidth = 20, alpha = .5, position = "identity")  + scale_fill_manual(values=c("red", "green", "orange")) + labs(x = "RANKING SCORE") +  theme( panel.background = element_rect(fill = "white", colour = "black"), panel.grid.major=element_line(colour = "grey"))
+
+output_histo_allotement
+
+tab_stats_combinaison_sorted$group_char = tab_stats_combinaison_sorted$group
+
+```
+
+## CONSTAT -  MAX HIGH-RISK RANKING SCORE FROM ALL POSSIBLE DESIGNS
+
+```{r, echo=FALSE, warning=FALSE}
+
+tab_high_rank = tab_stats_combinaison_sorted[ tab_stats_combinaison_sorted$METRIC_PVALUE == max( tab_stats_combinaison_sorted$METRIC_PVALUE ), ]
+
+  
+###GROUP WORST
+  
+group_high_rank = str_split(tab_high_rank$GROUP,pattern = "")[[1]]
+
+load("../Robjects/MOD.HIGH.RANK.ALLOTMENT.rdata")
+plot(mod.high.rank, hull = FALSE, ellipse = TRUE, main=c(paste("Axis1Axis2, PERMANOVA p-value = ",tab_high_rank$betadiv_pvaleur,sep="")))
+
+
+#fix css 
+Theme_publi = theme(
+ panel.background = element_rect(fill = "white", colour = "black"),
+ axis.text.y = element_text(size = 14),
+  axis.text.x = element_text(size = 14),
+  panel.grid.major=element_line(colour = "grey"),
+ legend.title=element_text(size=14),
+ legend.text=element_text(size=12),
+ axis.title.y=element_text(size=16, angle=90),
+ axis.title.x=element_text(size=16),title = element_text(size=14))
+
+load("../Robjects/PHY.RAREFIED.HIGH.RANK.ALLOTMENT.PLOT.rdata")
+
+#alpha-diversity plot
+al1<-ggplot(phy.rarefied.high.rank.plot, aes(x=Group, y=Richness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Chao1, p-value = ",round(tab_high_rank$richness_pvaleur,3),sep="")) + Theme_publi
+	al2<-ggplot(phy.rarefied.high.rank.plot, aes(x=Group, y=Evenness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Shannon, p-value = ",round(tab_high_rank$eveness_pvaleur,3),sep="")) + Theme_publi
+cpubli_high_rank <- cowplot::plot_grid(al1, al2, nrow = 1, ncol = 2, scale = .9, label_size = 28)
+cpubli_high_rank
+
+
+```
+
+## CONSTAT - BEST RANKING SCORE FROM ALL POSSIBLE DESIGNS
+
+Visualize the best ranking score. 
+
+```{r, echo=FALSE, warning=FALSE}
+tab_best = tab_stats_combinaison_sorted[ tab_stats_combinaison_sorted$METRIC_PVALUE == min( tab_stats_combinaison_sorted$METRIC_PVALUE ), ]
+	
+###GROUP BEST
+  
+group_best = str_split(tab_best$GROUP,pattern = "")[[1]]
+
+load("../Robjects/MOD.BEST.ALLOTMENT.rdata")
+
+plot(mod.best, hull = FALSE, ellipse = TRUE, main=c(paste("Axis1Axis2, PERMANOVA p-value = ",tab_best$betadiv_pvaleur,sep="")))
+
+load("../Robjects/PHY.RAREFIED.BEST.ALLOTMENT.PLOT.rdata")
+
+
+al1.best<-ggplot(phy.rarefied.best.plot, aes(x=Group, y=Richness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Chao1, p-value = ",round(tab_best$richness_pvaleur,3),sep="")) + Theme_publi
+	al2.best<-ggplot(phy.rarefied.best.plot, aes(x=Group, y=Evenness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Shannon, p-value = ",round(tab_best$eveness_pvaleur,3),sep="")) + Theme_publi
+
+cpubli_best <- cowplot::plot_grid(al1.best, al2.best, nrow = 1, ncol = 2, scale = .9, label_size = 28)
+cpubli_best
+
+
+```
+
+
+# HOW TO FIND THE BEST DESIGN ?
+
+Ranking score is a trustable metric to get homogenous group. The naïve way to find the best design would be to compute all possible combinations and retain only the minimal ranking score. 
+
+Base on out first simulation, the computation time is exactly 60 minutes for 100 000 combinations.
+
+We then simulate a few scenarios to estimate computation time for various design. 
+
+```{r, echo=FALSE , warning=FALSE}
+
+a <- comboGroupsCount(10, 2)
+b <- comboGroupsCount(12, 2)
+c <- comboGroupsCount(12, 3)
+d <- comboGroupsCount(20, 2)
+e <- comboGroupsCount(20, 4)
+f <- comboGroupsCount(24, 2)
+g <- comboGroupsCount(24, 3)
+h <- comboGroupsCount(27, 3)
+i <- comboGroupsCount(28,4)
+j <- comboGroupsCount(30, 2)
+k <- comboGroupsCount(30, 3)
+
+sa <-  a*3600/100000
+sb <-  b*3600/100000
+sc <-  c*3600/100000
+sd <-  d*3600/100000
+se <-  e*3600/100000
+sf <-  f*3600/100000
+sg <-  g*3600/100000
+sh <-  h*3600/100000
+si <-  i*3600/100000
+sj <-  j*3600/100000
+sk <-  k*3600/100000
+
+ta <- sa/3600/24/365.25
+tb <- sb/3600/24/365.25
+tc <- sc/3600/24/365.25
+td <- sd/3600/24/365.25
+te <- se/3600/24/365.25
+tf <- sf/3600/24/365.25
+tg <- sg/3600/24/365.25
+th <- sh/3600/24/365.25
+ti <- si/3600/24/365.25
+tj <- sj/3600/24/365.25
+tk <- sk/3600/24/365.25
+
+df.time = data.frame(
+  n_animals = c(10,12,12,20,20,24,24,27,28,30,30),
+ n_groups = c(2,2,3,2,4,2,3,3,4,2,3),
+n_possible_design  = c(a,b,c,d,e,f,g,h,i,j,k),
+  CPU_time_sec = c(sa,sb,sc,sd,se,sf,sg,sh,si,sj,sk),
+  CPU_time_year = c(ta,tb,tc,td,te,tf,tg,th,ti,tj,tk)
+   )
+colnames(df.time) = c("n animals","n groups","n possible designs","CPU time (sec)", "CPU time (year)")
+
+
+df.time
+
+
+```
+
+There is no general formula for partitioning a vector into groups of equal size. 
+
+The number of possible ways to partition a vector depends on the length of the vector and the size of the groups. 
+
+As an illustration, The formula for calculating the number of ways to partition a vector into groups of equal size 2  is given by the following expression:
+
+n! / (n / k)! * k^(n / k)
+
+where n is the number of elements in the vector, k is the size of each group, and ! the factorial function.
+
+Another way to approach this problem is to use generating functions, like the one propose by the R package RcppAlgos [ref]. 
+ 
+
+For the experiment generated in the "constat", it is of course possible to generate all the combinations in 1 hours and get the best result. But for more complex design, it becomes quickly impossible to wait for the generation of all results and get an exact best match.
+
+
+We then develop an algorithm based on HillDiv diversity measurements and anticlustering technics to obtain a optimal results in a very quick way.
+
+
+# AN OPTIMAL DESIGN TO REDUCE EXPERIMENTAL BIASES
+
+## ALGORITHM VALIDATION ON ALLOTMENT RESULTS
+
+```{r, echo=FALSE, warning=FALSE}
+
+
+load("../Robjects/RESULT.ALL.DIST.ANTICLUST.ALLOTMENT.400IT.rdata")
+
+#objective : find the group into the whole possible design dataframe :
+result.all.dist.at$GROUP2 = result.all.dist.at$GROUP
+result.all.dist.at$GROUP2 = str_replace_all(string = result.all.dist.at$GROUP2,pattern = "2",replacement = "3")
+result.all.dist.at$GROUP2 = str_replace_all(string = result.all.dist.at$GROUP2,pattern = "1",replacement = "2")
+result.all.dist.at$GROUP2 = str_replace_all(string = result.all.dist.at$GROUP2,pattern = "3",replacement = "1")
+
+result.all.dist.at$GROUP_FINAL = NA
+for(i in 1:length(result.all.dist.at$COLUMN)){
+  
+  res = result.all.dist.at[i,]
+  if( res$GROUP %in%  tab_stats_combinaison_ALL_WUNIFRAC$GROUP){
+    result.all.dist.at$GROUP_FINAL[i] = res$GROUP
+  }else{
+    if( res$GROUP2 %in% tab_stats_combinaison_ALL_WUNIFRAC$GROUP){
+    result.all.dist.at$GROUP_FINAL[i] = res$GROUP2
+  }
+    
+  }
+}
+
+#minimum ranking score = best design
+result.best = result.all.dist.at[ result.all.dist.at$METRIC_PVALUE == min(result.all.dist.at$METRIC_PVALUE),]
+
+tab_stats_result_allotement= tab_stats_combinaison_ALL_WUNIFRAC[tab_stats_combinaison_ALL_WUNIFRAC$GROUP %in% result.all.dist.at$GROUP_FINAL,]
+
+#tab_stats_result_allotement= tab_stats_combinaison_ALL[tab_stats_combinaison_ALL$GROUP %in% result.best$GROUP_FINAL,]
+tab_stats_result_allotement=tab_stats_result_allotement[tab_stats_result_allotement$METRIC_PVALUE == min(tab_stats_result_allotement$METRIC_PVALUE),]
+
+
+#generate same graphic from previously but identifying suggested design 
+compare_mean <- tab_stats_combinaison_sorted %>%
+        dplyr::group_by(group) %>%
+        dplyr::summarise(Mean = mean(METRIC_PVALUE))
+
+compare_mean <- compare_mean %>% 
+   dplyr::add_row(group = "SUGGESTED DESIGN", Mean=tab_stats_result_allotement$METRIC_PVALUE)
+
+
+
+output_histo_allotement_opti <- ggplot(tab_stats_combinaison_sorted, aes(x = METRIC_PVALUE, fill = group)) +
+        geom_histogram(binwidth = 20, alpha = .5, position = "identity")  + scale_fill_manual(values=c("red", "green", "orange")) +
+        geom_vline(data = compare_mean[4,], aes(xintercept = Mean,color="SUGGESTED DESIGN"),linetype = "dashed", size = 1) + labs(x = "RANKING SCORE") + Theme_publi 
+
+output_histo_allotement_opti
+
+###GROUP OPTI BEST
+tab_best = tab_stats_result_allotement
+
+load("../Robjects/MOD.ALLOTMENT.rdata")
+
+plot(mod.allotment, hull = FALSE, ellipse = TRUE, main=c(paste("Axis1Axis2, PERMANOVA p-value = ",tab_best$betadiv_pvaleur,sep="")))
+
+load("../Robjects/PHY.RAREFIED.OPTI.BEST.ALLOTMENT.PLOT.rdata")
+
+#alpha div
+al1<-ggplot(phy.sam.data, aes(x=Group, y=Richness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Chao1, p-value = ",round(tab_best$richness_pvaleur,3),sep=""))+ Theme_publi #+  theme( panel.background = element_rect(fill = "white", colour = "black"), panel.grid.major=element_line(colour = "grey"))
+	al2<-ggplot(phy.sam.data, aes(x=Group, y=Evenness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Shannon, p-value = ",round(tab_best$eveness_pvaleur,3),sep="")) + Theme_publi#+  theme( panel.background = element_rect(fill = "white", colour = "black"), panel.grid.major=element_line(colour = "grey"))
+	cpubli.allotment <- cowplot::plot_grid(al1, al2,nrow = 1, ncol = 2, scale = .9, label_size = 28)
+cpubli.allotment
+
+
+```
+
+
+
+## ALGORITHM VALIDATION ON THIRD PARRY DATA (Neuman et al.)
+
+###  HISTOGRAM - 90000 RANDOMLY SIMULATING 90000 DESIGNS
+
+```{r, echo=FALSE,warning=FALSE}
+#load phyloseq object from SRA experiement already rarefied at 32629
+load("../Robjects/OUTPUT_PHYLOSEQ_RAREFIED_R_OBJECT_SRA.rdata")
+
+#load raw phyloseq object
+load("../Robjects/OUTPUT_PHYLOSEQ_R_OBJECT_SRA.rdata")
+
+#load 90000 random sampling designs - tab_stats_combinaison_SRA_ALL
+load("../Robjects/OUTPUT_TAB_STATS_COMBINATION_SRA_ALL_90000_WUNIFRAC_PUBLICATION_V1.rdata",verbose=TRUE)
+
+#estimate alpha diversiyt metrics
+rich = estimate_richness(phy.rarefied, measures = c("Chao1","InvSimpson"))
+
+Richness= rich[,colnames(rich) == "Chao1"]
+Evenness =  rich[,colnames(rich) == "InvSimpson"]
+meta <- cbind(normalize_custom(Richness), normalize_custom(Evenness))
+rownames(meta) = rownames(rich)
+phy.rarefied@sam_data$Richness = Richness
+
+phy.rarefied@sam_data$Evenness = Evenness
+
+phy.sra = phy.rarefied
+
+
+load("../Robjects/RESULT.ALL.DIST.ANTICLUST.SRA.400IT.rdata")
+
+
+result.sra= tab_stats_combinaison_SRA_ALL[length(tab_stats_combinaison_SRA_ALL$COLUMN),]
+
+tab_stats_combinaison_SRA_sorted =tab_stats_combinaison_SRA_ALL[ order(tab_stats_combinaison_SRA_ALL$METRIC_PVALUE),]
+
+quantile_metric= quantile(tab_stats_combinaison_SRA_sorted$METRIC_PVALUE, probs = c(0.05,0.95))
+tab_stats_combinaison_SRA_sorted$group = "SUB-OPTIMAL DESIGN"
+tab_stats_combinaison_SRA_sorted$group[tab_stats_combinaison_SRA_sorted$METRIC_PVALUE <= as.numeric(quantile_metric[1]) ] = "OPTIMAL DESIGN"
+tab_stats_combinaison_SRA_sorted$group[tab_stats_combinaison_SRA_sorted$METRIC_PVALUE >= as.numeric(quantile_metric[2]) ] = "HIGH-RISK DESIGN"
+
+result.best.sra =  result.all.dist.sra[ result.all.dist.sra$METRIC_PVALUE == min(result.all.dist.sra$METRIC_PVALUE),]
+ load("../Robjects/OUTPUT_TAB_STATS_COMBINATION_SRA_CUSTOM_PUBLICATION_V1.rdata") 
+  
+tab_stats_combinaison_SRA_sorted =tab_stats_combinaison_SRA_CUSTOM[ order(tab_stats_combinaison_SRA_CUSTOM$METRIC_PVALUE),]
+
+quantile_metric= quantile(tab_stats_combinaison_SRA_sorted$METRIC_PVALUE, probs = c(0.05,0.95))
+tab_stats_combinaison_SRA_sorted$group = "SUB-OPTIMAL DESIGN"
+tab_stats_combinaison_SRA_sorted$group[tab_stats_combinaison_SRA_sorted$METRIC_PVALUE <= as.numeric(quantile_metric[1]) ] = "OPTIMAL DESIGN"
+tab_stats_combinaison_SRA_sorted$group[tab_stats_combinaison_SRA_sorted$METRIC_PVALUE >= as.numeric(quantile_metric[2]) ] = "HIGH-RISK DESIGN"
+
+tab_stats_result_sra= tab_stats_combinaison_SRA_sorted[tab_stats_combinaison_SRA_sorted$GROUP %in% result.best.sra$GROUP,]
+tab_stats_study_sra= tab_stats_combinaison_SRA_sorted[tab_stats_combinaison_SRA_sorted$GROUP %in% result.sra$GROUP,]
+
+#generate figure - including SRA study design and suggested design by Allomento
+
+compare_mean <- tab_stats_combinaison_SRA_sorted %>%
+        dplyr::group_by(group) %>%
+        dplyr::summarise(Mean = mean(METRIC_PVALUE))
+
+
+compare_mean <- compare_mean %>% 
+   add_row(group = "SUGGESTED DESIGN", Mean=tab_stats_result_sra$METRIC_PVALUE)
+compare_mean <- compare_mean %>% 
+   add_row(group = "STUDY DESIGN", Mean=tab_stats_study_sra$METRIC_PVALUE)
+
+output_histo_sra <- ggplot(tab_stats_combinaison_SRA_sorted, aes(x = METRIC_PVALUE, fill = group)) +
+        geom_histogram(binwidth = 20, alpha = .5, position = "identity")  + scale_fill_manual(values=c("red", "green", "orange")) +
+        geom_vline(data = compare_mean[4,], aes(xintercept = Mean,color="SUGGESTED DESIGN"),linetype = "dashed", size = 1) +
+        geom_vline(data = compare_mean[5,], aes(xintercept = Mean,color="STUDY DESIGN"),linetype = "dashed", size = 1) + labs(x = "RANKING SCORE")  + Theme_publi 
+output_histo_sra 
+```
+
+### ALPHA AND BETA DIVERSITIES VALIDATION ON BACT-TO-BATCH SUGGESTED DESIGN
+
+```{r allotmento design, echo=FALSE, warning=FALSE}
+
+#Visualize SRA design and study design
+  phy.asv = data.frame(phy.rarefied@otu_table)
+  phy.tree = phy.rarefied@phy_tree
+  unifracs <- GUniFrac(t(phy.asv), phy.tree, alpha=c(0, 0.5, 1))$unifracs
+  Dist_BASE_M <- unifracs[, , "d_1"]
+  
+#suggested design  
+group_best = str_split(result.best.sra$GROUP,pattern = "")[[1]]
+phy.rarefied.sra.opti.best=phy.rarefied
+phy.rarefied.sra.opti.best@sam_data$BLOCK  = group_best
+
+
+#betadiv
+groups <- factor(phy.rarefied.sra.opti.best@sam_data$BLOCK, labels = c("TPC","PBS","Tuftsin"))
+mod.sra.opti.best <- betadisper(as.dist(Dist_BASE_M), groups,)
+plot(mod.sra.opti.best, hull = FALSE, ellipse = TRUE, main=c(paste("Axis1Axis2, PERMANOVA p-value = ",result.best.sra$betadiv_pvaleur,sep="")))
+
+phy.rarefied.sra.opti.best@sam_data$Group[ phy.rarefied.sra.opti.best@sam_data$BLOCK == 1] = "TPC"
+phy.rarefied.sra.opti.best@sam_data$Group[ phy.rarefied.sra.opti.best@sam_data$BLOCK == 2] = "PBS"
+phy.rarefied.sra.opti.best@sam_data$Group[ phy.rarefied.sra.opti.best@sam_data$BLOCK == 3] = "Tuftsin"
+
+#alpha div
+al1<-ggplot(phy.rarefied.sra.opti.best@sam_data[!is.na(phy.rarefied.sra.opti.best@sam_data$BLOCK)], aes(x=Group, y=Richness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Chao1, p-value = ",round(result.best.sra$richness_pvaleur,3),sep="")) + Theme_publi 
+	al2<-ggplot(phy.rarefied.sra.opti.best@sam_data[!is.na(phy.rarefied.sra.opti.best@sam_data$BLOCK)], aes(x=Group, y=Evenness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Shannon, p-value = ",result.best.sra$eveness_pvaleur,sep="")) + Theme_publi
+	cpubli <- cowplot::plot_grid(al1, al2,nrow = 1, ncol = 2, scale = .9, label_size = 28)
+cpubli
+
+```
+
+### ALPHA AND BETA DIVERSITIES VALIDATON ON STUDY DESIGN
+
+```{r study design, echo=FALSE, warning=FALSE}
+
+#sra study design  
+group_study = str_split(tab_stats_study_sra$GROUP,pattern = "")[[1]]
+phy.rarefied.sra.opti.study=phy.rarefied
+phy.rarefied.sra.opti.study@sam_data$BLOCK  = group_study
+
+
+#betadiv
+groups <- factor(phy.rarefied.sra.opti.study@sam_data$BLOCK, labels = c("TPC","PBS","Tuftsin"))
+mod <- betadisper(as.dist(Dist_BASE_M), groups,)
+plot(mod, hull = FALSE, ellipse = TRUE, main=c(paste("Axis1Axis2, PERMANOVA p-value = ",tab_stats_study_sra$betadiv_pvaleur,sep="")))
+
+phy.rarefied.sra.opti.study@sam_data$Group[ phy.rarefied.sra.opti.study@sam_data$BLOCK == 1] = "TPC"
+phy.rarefied.sra.opti.study@sam_data$Group[ phy.rarefied.sra.opti.study@sam_data$BLOCK == 2] = "PBS"
+phy.rarefied.sra.opti.study@sam_data$Group[ phy.rarefied.sra.opti.study@sam_data$BLOCK == 3] = "Tuftsin"
+
+#alpha div
+al1<-ggplot(phy.rarefied.sra.opti.study@sam_data[!is.na(phy.rarefied.sra.opti.study@sam_data$BLOCK)], aes(x=Group, y=Richness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Chao1, p-value = ",round(tab_stats_study_sra$richness_pvaleur,3),sep="")) + Theme_publi 
+	al2<-ggplot(phy.rarefied.sra.opti.study@sam_data[!is.na(phy.rarefied.sra.opti.study@sam_data$BLOCK)], aes(x=Group, y=Evenness, color=Group)) +
+	  geom_boxplot() + geom_point(size = 2) + ggtitle(paste("Shannon, p-value = ",round(tab_stats_study_sra$eveness_pvaleur,3),sep="")) +  Theme_publi
+	c <- cowplot::plot_grid(al1, al2,nrow = 1, ncol = 2, scale = .9, label_size = 14)
+c
+
+
+```
+
