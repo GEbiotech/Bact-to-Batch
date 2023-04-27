@@ -1,11 +1,13 @@
 # Bact-to-Batch
 
 
-The **Bact-to-Batch** repositorty helps you create dynamic analysis documents that combine code and rendered output (such as figures) to generate the complete analysis described in this study : <i>Bact-To-Batch: a microbiota-based tool to determine optimal animal allocation in experimental designs</i> . 
+The **Bact-to-Batch** repositorty helps you create dynamic analysis documents that combine code and rendered output (such as figures) to generate the complete analysis described in this study : <i>Bact-to-Batch: A Microbiota-Based Tool to Determine Optimal Animal Allocation in Experimental Designs</i> . 
+Website: https://www.mdpi.com/1422-0067/24/9/7912
+PDF Version: https://www.mdpi.com/1422-0067/24/9/7912/pdf
 
 ## Article
 
-Currrently under submission : <i>Bact-To-Batch: a microbiota-based tool to determine optimal animal allocation in experimental designs</i> 
+<i>Bact-to-Batch: A Microbiota-Based Tool to Determine Optimal Animal Allocation in Experimental Designs</i> 
 
 ## Installation
 
