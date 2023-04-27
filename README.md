@@ -14,7 +14,7 @@ PDF Version: https://www.mdpi.com/1422-0067/24/9/7912/pdf
 
 ## Installation
 
-The easiest way to use the **Bact-To-Batch** markdown is from within the [RStudio IDE](https://posit.co/download/rstudio-desktop/), but you don't need to explicitly install it or load it, as RStudio automatically does both when needed. 
+The easiest way to use the **Bact-to-Batch** markdown is from within the [RStudio IDE](https://posit.co/download/rstudio-desktop/), but you don't need to explicitly install it or load it, as RStudio automatically does both when needed. 
 
 If you want to use the rmarkdown package outside of RStudio, you can install the package from CRAN as follows:
 
