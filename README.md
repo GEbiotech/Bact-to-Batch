@@ -43,6 +43,9 @@ The HTML output is also provide in the HTML folder of the project, so you can ha
 
 ## Getting help
 
-Feel free to contact the author of the publication once published
+Feel free to contact the author of the publication :
+
+g.even@genesdiffusion.com
+
 
 
